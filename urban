@@ -1,0 +1,134 @@
+#!/bin/bash
+# script to automatically post to allurbansource.wordpress.com
+
+email="evanhadfield@gmail.com"
+blog_email="cuqu574sopi@post.wordpress.com" #wordpress auto-post email
+
+tag_checks=( "New York" "San Francisco" "Chicago" )
+
+
+categories=( "Future" "City Life" "Images" "Urban Planning" "Urban Economics" "Uncategorized" )
+
+debug=false
+
+
+if $debug ; then
+    destination="$email"
+else
+    destination="$blog_email"
+fi
+    
+
+function get_tags() {
+
+    local __tagsvar=$1
+    local tags_found=""
+
+    local source="$2"
+
+    echo "Searching in: $source"
+    for i in "${tag_checks[@]}"; do
+	echo "Checking: $i"
+	if grep -q "$i" <<< "$source" ; then
+	    if [ "$tags_found" = "" ]; then
+		tags_found="$i"
+	    else
+		tags_found+=", $i"
+	    fi
+	fi
+    done
+
+    if [ "$tags_found" = "" ]; then
+	echo "No tags found."
+    else
+	echo "Tags found: $tags_found"
+    fi
+	
+    eval $__tagsvar="'$tags_found'"
+}
+
+function get_input() {
+    
+    local __inputvar=$1
+    local input=""
+    
+    while [ "$input" = "" ]; do
+	read input
+	if [ "$input" = "" ] ; then
+	    echo "No text entered."
+	else
+	    break
+	fi
+    done
+    
+    eval $__inputvar="'$input'"
+}
+
+if [ $1 ] ; then
+
+if [ $1 = "post" ] ; then
+
+    echo "Category:"
+    get_input category
+
+    echo "Title:"
+    get_input title
+
+    echo "Post Text:"
+    get_input text
+
+    get_tags tags "$text"
+    
+    if $debug ; then
+	echo -n "Submitting..."
+	echo "  To: $destination"
+	echo "  Title: $title"
+	echo "  $text"
+	echo "  Tags: $tags"
+	echo "  Category: $category"
+    fi
+
+    message=$(cat <<EOF
+To: $destination
+Subject: $title
+
+$text
+
+EOF
+)
+
+    message+="\n"'[tags '"$tags"']'
+    message+="\n"'[category '"$category"']'
+
+    echo "$message"
+
+    echo "$message" | ssmtp $destination
+#    ssmtp $destination < "$message"
+
+<<COMMENT
+
+    ssmtp $destination << EOF
+To: $destination
+Subject: $title
+
+$text
+
+^[tags $tags^]
+^[category $category^]
+EOF
+COMMENT
+
+    echo " complete."
+
+elif [ $1 = "help" ] ; then
+    echo "Use this script to post to your blog."
+    echo "Commands:"
+    echo "  post - allows for direct posting."
+else
+    echo "Command not recognized. Type 'help' for command list"
+fi
+
+else
+    echo "No command entered. Type 'help' for command list"
+fi
+	
